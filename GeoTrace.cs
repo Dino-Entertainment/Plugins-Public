@@ -23,12 +23,115 @@ namespace Core
 
         public override void Load(bool startup)
         {
+            OnPlayerConnectEvent.Register(GeoTrace, Priority.High);
             Command.Register(new CmdGeoTrace());
         }
 
         public override void Unload(bool shutdown)
         {
+            OnPlayerConnectEvent.Unregister(GeoTrace);
             Command.Unregister(Command.Find("GeoTrace"));
+        }
+
+        void GeoTrace(Player p)
+        {
+            string msg = "λNICK &Sis using a private IP";
+
+            string name = p.name;
+            string ip = p.ip;
+            ItemPerms opchat = Chat.OpchatPerms;
+
+            if (ip == null) return;
+
+            if (IPUtil.IsPrivate(IPAddress.Parse(ip)))
+            {
+                msg = msg.Replace("λNICK", name);
+
+                Chat.MessageFrom(p, msg,
+                                (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+            }
+
+            string json, asn = "N/A", city = "N/A", continent = "N/A", iso = "N/A", country = "N/A", region = "N/A", proxy = "N/A", proxylikeness = "N/A", type = "N/A", isp = "N/A", org = "N/A", hosting = "N/A", mobile = "N/A", ascode = "N/A"; ;
+            using (WebClient client = HttpUtil.CreateWebClient())
+            {
+                json = client.DownloadString("http://ip-api.com/json/" + ip + "?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,isp,org,as,asname,reverse,mobile,proxy,hosting,query");
+            }
+
+            JsonReader reader = new JsonReader(json);
+            reader.OnMember = (obj, key, value) =>
+            {
+                if (key == "asname") asn = (string)value;
+                if (key == "city") city = (string)value;
+                if (key == "country") country = (string)value;
+                if (key == "continent") continent = (string)value;
+                if (key == "region") region = (string)value;
+                if (key == "proxy") proxy = (string)value;
+                if (key == "mobile") mobile = (string)value;
+                if (key == "hosting") hosting = (string)value;
+                if (key == "type") type = (string)value;
+                if (key == "as") ascode = (string)value;
+                if (key == "isp") isp = (string)value;
+                if (key == "org") org = (string)value;
+                if (key == "continentCode") iso = (string)value;
+            };
+
+            reader.Parse();
+            if (reader.Failed)
+            {
+                msg = "&SError parsing GeoIP info about λNICK.";
+                msg = msg.Replace("λNICK", p.ColoredName);
+                Chat.MessageFrom(p, msg, (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+                return;
+            }
+
+            msg = "λNICK &Sconnected from λCITY, λREGION, λCOUNTRY.";
+            msg = msg
+                .Replace("λNICK", p.ColoredName)
+                .Replace("λCITY", city)
+                .Replace("λREGION", region)
+                .Replace("λCOUNTRY", country);
+
+
+            Logger.Log(LogType.UserActivity, p.ColoredName + " &Sconnected to the server from " + city + ", " + region + ", " + country + ".");
+
+            Chat.MessageFrom(p, msg, (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+            if (proxy == "true" && hosting == "true")
+            {
+                msg = "&WWarning&S: λNICK &Sis likely using a proxy on a VPS or Dedicated Server.";
+                msg = msg.Replace("λNICK", p.ColoredName);
+                Logger.Log(LogType.UserActivity, p.ColoredName + " &Sis suspected using a proxy on a VPS or Dedicated Server..");
+                Chat.MessageFrom(p, msg, (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+                DiscordPlugin.Bot.SendStaffMessage(msg);
+                return;
+            }
+            else if (proxy == "true" && hosting == "true")
+            {
+                msg = "&WWarning&S: λNICK &Sis using a VPS or Dedicated Server.";
+                msg = msg.Replace("λNICK", p.ColoredName);
+                Logger.Log(LogType.UserActivity, p.ColoredName + " &Sis suspected using a VPS or Dedicated Server..");
+                Chat.MessageFrom(p, msg, (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+                DiscordPlugin.Bot.SendStaffMessage(msg);
+                return;
+            }
+            else if (proxy == "yes" && hosting == "false")
+            {
+                msg = "&WWarning&S: λNICK &Sis using a proxy on what is likely to be a residential connection.";
+                msg = msg.Replace("λNICK", p.ColoredName);
+                Logger.Log(LogType.UserActivity, p.ColoredName + " &Sis suspected to be using a proxy on what is likely to be a residential connection.");
+                Chat.MessageFrom(p, msg, (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+                DiscordPlugin.Bot.SendStaffMessage(msg);
+                return;
+            }
+            else
+            {
+                msg = "λNICK &Sis using a regular IP.";
+                msg = msg.Replace("λNICK", p.ColoredName);
+                Logger.Log(LogType.UserActivity, p.ColoredName + " &Sis using a regular IP.");
+                Chat.MessageFrom(p, msg, (pl, obj) => pl.CanSee(p) && opchat.UsableBy(pl.Rank));
+                DiscordPlugin.Bot.SendStaffMessage(msg);
+                return;
+            }
+
         }
 
         public class CmdGeoTrace : Command2
@@ -76,11 +179,11 @@ namespace Core
                 reader.Parse();
                 if (reader.Failed) { p.Message("&WError parsing GeoIP info"); return; }
 
-                if (proxy == "false" && hosting == "true") 
+                if (proxy == "false" && hosting == "true")
                 {
                     proxylikeness = "&4BOT HIGHLY LIKELY!!";
                 }
-                else if (proxy == "true" && hosting == "false") 
+                else if (proxy == "true" && hosting == "false")
                 {
                     proxylikeness = "&4VPN/PROXY HIGHLY LIKELY!!";
                 }
@@ -94,12 +197,11 @@ namespace Core
                 p.Message("&S· Location: &T" + city + ", " + region + ", " + country + ", " + continent + " (" + iso + ")");
                 p.Message("&S· ISP: &T" + isp);
                 p.Message("&S· ISP ORG: &T" + org);
-                p.Message("&S· AS: &T" + ascode);
                 p.Message("&S· Proxy: &T" + proxy.Capitalize());
                 p.Message("&S· Mobile: &T" + mobile.Capitalize());
                 p.Message("&S· Hosting: &T" + hosting.Capitalize());
                 p.Message("&S· Proxy: " + proxylikeness);
-                
+
             }
 
             static string FindIP(Player p, string message, string cmd, out string name)
