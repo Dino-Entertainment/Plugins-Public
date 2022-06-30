@@ -104,7 +104,7 @@ namespace Core
                 DiscordPlugin.Bot.SendStaffMessage(msg);
                 return;
             }
-            else if (proxy == "true" && hosting == "true")
+            else if (proxy == "false" && hosting == "true")
             {
                 msg = "&WWarning&S: λNICK &Sis using a VPS or Dedicated Server.";
                 msg = msg.Replace("λNICK", p.ColoredName);
@@ -113,7 +113,7 @@ namespace Core
                 DiscordPlugin.Bot.SendStaffMessage(msg);
                 return;
             }
-            else if (proxy == "yes" && hosting == "false")
+            else if (proxy == "true" && hosting == "false")
             {
                 msg = "&WWarning&S: λNICK &Sis using a proxy on what is likely to be a residential connection.";
                 msg = msg.Replace("λNICK", p.ColoredName);
@@ -185,9 +185,13 @@ namespace Core
                 }
                 else if (proxy == "true" && hosting == "false")
                 {
+                    proxylikeness = "&4RESIDENTIAL VPN/PROXY HIGHLY LIKELY!!";
+                }
+                else if (proxy == "true" && hosting == "true")
+                {
                     proxylikeness = "&4VPN/PROXY HIGHLY LIKELY!!";
                 }
-                else if ((proxy == "false" && hosting == "false"))
+                else if (proxy == "false" && hosting == "false")
                 {
                     proxylikeness = "&2UNLIKELY TO BE A THREAT";
                 }
